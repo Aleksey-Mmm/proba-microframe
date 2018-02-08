@@ -5,4 +5,15 @@
  * Time: 21:41
  */
 
-echo 'Hello!';
+use Framework\Http\Request;
+
+chdir(dirname(__DIR__)); //поднялись в корневую директорию
+require 'src/Framework/Http/Request.php';
+###  initialization
+$request = new Request();
+
+### action
+$name = isset($request->getQueryParams()['name']) ? $request->getQueryParams()['name'] : 'Guest';
+
+header('X-Developer: AlexMMM');
+echo 'Hello, '. $name . '!';

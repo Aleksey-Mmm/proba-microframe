@@ -9,7 +9,12 @@
 //use Framework\Http\RequestFactory;
 //use Zend\Diactoros\Response;
 //use Framework\Http\ResponseSender;
+use Framework\Http\Router\Exception\RequestNotMatchedException;
+use Framework\Http\Router\RouteCollection;
+use Framework\Http\Router\Router;
+use Psr\Http\Message\ServerRequestInterface;
 use Zend\Diactoros\Response\HtmlResponse;
+use Zend\Diactoros\Response\JsonResponse;
 use Zend\Diactoros\Response\SapiEmitter;
 use Zend\Diactoros\ServerRequestFactory;
 
@@ -23,13 +28,86 @@ require 'vendor/autoload.php';
 //$request->withQueryParams($_GET);
 //$request->withParsedBody($_POST);
 //==========
+
+//создаем и заполняем коллекцию маршрутов
+
+$routes = new RouteCollection();
+
+$routes->get('home', '/', function (ServerRequestInterface $request){
+    $name = isset($request->getQueryParams()['name']) && ($request->getQueryParams()['name'] != '') ? $request->getQueryParams()['name'] : 'Guest';
+    return new HtmlResponse('Hello, '. $name. '!');
+});
+
+$routes->get('about', '/about', function (){
+    return new HtmlResponse('Это прсто сайт. Страница about.');
+});
+
+$routes->get('blog', '/blog', function (){
+    return new JsonResponse([
+        ['id' => 2, 'title' => 'Second page'],
+        ['id' => 1, 'title' => 'first Page']
+    ]);
+});
+
+$routes->get('blog_show', '/blog/{id}', function (ServerRequestInterface $request){
+    $id = $request->getAttribute('id');
+    if ($id > 5) {
+        return new JsonResponse(['Error'=>'Undefined page'], 404);
+    }
+    return new JsonResponse(['id' => $id, 'title' => 'Page #'. $id]);
+}, ['id' => '\d+']);
+
+//включаем роутер
+$router = new Router($routes);
+
+#Running
+
 $request =  ServerRequestFactory::fromGlobals();
 
-### action
-$name = isset($request->getQueryParams()['name']) && ($request->getQueryParams()['name'] != '') ? $request->getQueryParams()['name'] : 'Guest';
+try {
+    //находим маршрут по паттерну переданному из строки запроса и вычисляем нужные нам атрибуты
+    $result = $router->match($request);
+    //добавляем эти атрибуты к строке запроса
+    foreach ($result->getAttributes() as $attribute => $value) {
+        $request = $request->withAttribute($attribute, $value);
+    }
+    //в $action загружаем функцию-обработчик этого маршрута
+    $action = $result->getHandler();
+    //в ответ ($response) результат обработки маршрута этим обработчиком
+    $response = $action($request);
+} catch (RequestNotMatchedException $e) {
+    $response = new JsonResponse(['Error'=>'Undefined page'], 404);
+}
 
-$response = (new HtmlResponse('Hello, '. $name. '!'));
-    //->withHeader('X-Developer', 'AlexMmm');
+### action
+
+//$path = $request->getUri()->getPath();
+
+/*
+if ($path === '/') {
+    $name = isset($request->getQueryParams()['name']) && ($request->getQueryParams()['name'] != '') ? $request->getQueryParams()['name'] : 'Guest';
+    $response = (new HtmlResponse('Hello, '. $name. '!'));
+} elseif ($path === '/about') {
+    $response = (new HtmlResponse('Это прсто сайт. Страница about.'));
+
+} elseif ($path === '/blog') {
+    $response = (new JsonResponse([
+        ['id' => 2, 'title' => 'Second page'],
+        ['id' => 1, 'title' => 'first Page']
+    ]));
+} elseif (preg_match('#^/blog/(?P<id>\d+)$#i', $path, $matches)) {
+    $id = $matches['id'];
+    if ($id > 2) {
+        $response = new JsonResponse(['Error'=>'Undefined page'], 404);
+    } else {
+        $response = new JsonResponse(['id' => $id, 'title' => 'Page #'. $id]);
+    }
+
+} else {
+    $response = (new JsonResponse(['Error'=>'Undefined page'], 404));
+}
+*/
+
 //header('X-Developer: AlexMMM');
 
 ### postprocessing

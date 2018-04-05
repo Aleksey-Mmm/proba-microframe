@@ -17,6 +17,7 @@
     "phpunit/phpunit": "^5.7"
   },
   "scripts": {
-    "test": "phpunit.bat "
+    "test": "phpunit.bat ",
+    "serve": "php -S 127.0.0.1:8080 -t public"
   }
 }

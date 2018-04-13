@@ -9,11 +9,16 @@
 //use Framework\Http\RequestFactory;
 //use Zend\Diactoros\Response;
 //use Framework\Http\ResponseSender;
+use App\Http\Action\AboutAction;
+use App\Http\Action\Blog\IndexAction;
+use App\Http\Action\Blog\ShowAction;
+use App\Http\Action\HelloAction;
+use Framework\Http\ActionResolver;
 use Framework\Http\Router\Exception\RequestNotMatchedException;
 use Framework\Http\Router\RouteCollection;
 use Framework\Http\Router\Router;
-use Psr\Http\Message\ServerRequestInterface;
-use Zend\Diactoros\Response\HtmlResponse;
+//use Psr\Http\Message\ServerRequestInterface;
+//use Zend\Diactoros\Response\HtmlResponse;
 use Zend\Diactoros\Response\JsonResponse;
 use Zend\Diactoros\Response\SapiEmitter;
 use Zend\Diactoros\ServerRequestFactory;
@@ -33,29 +38,19 @@ require 'vendor/autoload.php';
 
 $routes = new RouteCollection();
 
-$routes->get('home', '/', function (ServerRequestInterface $request){
+
+/*$routes->get('home', '/', function (ServerRequestInterface $request){
     $name = isset($request->getQueryParams()['name']) && ($request->getQueryParams()['name'] != '') ? $request->getQueryParams()['name'] : 'Guest';
     return new HtmlResponse('Hello, '. $name. '!');
-});
+});*/
 
-$routes->get('about', '/about', function (){
-    return new HtmlResponse('Это прсто сайт. Страница about.');
-});
+$routes->get('home', '/', HelloAction::class);
 
-$routes->get('blog', '/blog', function (){
-    return new JsonResponse([
-        ['id' => 2, 'title' => 'Second page'],
-        ['id' => 1, 'title' => 'first Page']
-    ]);
-});
+$routes->get('about', '/about', new AboutAction());
 
-$routes->get('blog_show', '/blog/{id}', function (ServerRequestInterface $request){
-    $id = $request->getAttribute('id');
-    if ($id > 5) {
-        return new JsonResponse(['Error'=>'Undefined page'], 404);
-    }
-    return new JsonResponse(['id' => $id, 'title' => 'Page #'. $id]);
-}, ['id' => '\d+']);
+$routes->get('blog', '/blog', IndexAction::class);
+
+$routes->get('blog_show', '/blog/{id}', ShowAction::class, ['id' => '\d+']);
 
 //включаем роутер
 $router = new Router($routes);
@@ -68,11 +63,13 @@ try {
     //находим маршрут по паттерну переданному из строки запроса и вычисляем нужные нам атрибуты
     $result = $router->match($request);
     //добавляем эти атрибуты к строке запроса
+    /** @var \Framework\Http\Router\Result $result */
     foreach ($result->getAttributes() as $attribute => $value) {
         $request = $request->withAttribute($attribute, $value);
     }
     //в $action загружаем функцию-обработчик этого маршрута
-    $action = $result->getHandler();
+    $handler = $result->getHandler();
+    $action = (new ActionResolver())->resolve($handler);
     //в ответ ($response) результат обработки маршрута этим обработчиком
     $response = $action($request);
 } catch (RequestNotMatchedException $e) {
